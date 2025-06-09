@@ -134,15 +134,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/products", async (req, res) => {
     try {
+      console.log("API: Received product creation request:", req.body);
+      
       const storage = await getStorage();
+      console.log("API: Storage obtained:", storage.constructor.name);
+      
       const productData = insertProductSchema.parse(req.body);
+      console.log("API: Product data validated:", productData);
+      
       const product = await storage.createProduct(productData);
+      console.log("API: Product created successfully:", product);
+      
+      // Verify the product was actually saved by fetching it back
+      try {
+        const savedProduct = await storage.getProduct(product.id);
+        console.log("API: Verification - Product retrieved after creation:", savedProduct ? "SUCCESS" : "FAILED");
+        
+        if (!savedProduct) {
+          console.error("API: ERROR - Product was not saved properly");
+          return res.status(500).json({ message: "Product creation failed - not saved to database" });
+        }
+        
+        // Double check by fetching all products to see count
+        const allProducts = await storage.getProducts();
+        console.log("API: Total products in database after creation:", allProducts.length);
+        
+      } catch (verifyError) {
+        console.error("API: Verification error:", verifyError);
+        return res.status(500).json({ message: "Product verification failed", error: verifyError.message });
+      }
+      
       res.status(201).json(product);
     } catch (error) {
+      console.error("API: Product creation error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid product data", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create product" });
+      res.status(500).json({ message: "Failed to create product", error: error.message });
     }
   });
 

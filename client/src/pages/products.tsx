@@ -276,9 +276,9 @@ export default function Products() {
       gstTax: "GST @ 5%",
       packagingCharges: "",
       trackInventory: false,
-      quantityInStock: "",
+      quantityInStock: 0,
       purchasePrice: "",
-      quantityOrdered: "",
+      quantityOrdered: 0,
       imageUrl: "",
     },
   });
@@ -289,20 +289,28 @@ export default function Products() {
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertProduct) => {
-      return await apiRequest("POST", "/api/products", data);
+      console.log("Client: Sending product data to API:", data);
+      const result = await apiRequest("POST", "/api/products", data);
+      console.log("Client: API response:", result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      console.log("Client: Product created successfully:", result);
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      toast({ title: "Product created successfully" });
+      toast({ 
+        title: "Success",
+        description: "Product created successfully"
+      });
       setIsAddDialogOpen(false);
-      form.reset();
-      setSelectedCategories([]);
-      setSelectedUnit("");
-      setSelectedOrderType("");
-      setSelectedCategory("");
-      setAvailableSubcategories([]);
-      setCategorization("veg");
-      setAvailableCategories(vegCategories);
+      resetForm();
+    },
+    onError: (error) => {
+      console.error("Client: Failed to create product:", error);
+      toast({ 
+        title: "Error",
+        description: `Failed to create product: ${error.message || 'Unknown error'}`,
+        variant: "destructive"
+      });
     },
   });
 
@@ -312,16 +320,20 @@ export default function Products() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      toast({ title: "Product updated successfully" });
+      toast({ 
+        title: "Success",
+        description: "Product updated successfully"
+      });
       setEditingProduct(null);
-      form.reset();
-      setSelectedCategories([]);
-      setSelectedUnit("");
-      setSelectedOrderType("");
-      setSelectedCategory("");
-      setAvailableSubcategories([]);
-      setCategorization("veg");
-      setAvailableCategories(vegCategories);
+      resetForm();
+    },
+    onError: (error) => {
+      console.error("Failed to update product:", error);
+      toast({ 
+        title: "Error",
+        description: "Failed to update product",
+        variant: "destructive"
+      });
     },
   });
 
@@ -363,18 +375,34 @@ export default function Products() {
   };
 
   const onSubmit = (data: any) => {
+    console.log("Client: Form submission data:", data);
+    
+    // Validate required fields
+    if (!data.name || data.name.trim() === "") {
+      toast({
+        title: "Validation Error",
+        description: "Product name is required",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Ensure all required fields are present and properly formatted
     const productData: InsertProduct = {
-      name: data.name,
-      description: data.description,
-      price: data.sellingPrice || data.price,
-      category: data.itemCategory || data.category,
-      stock: data.quantityInStock ? parseInt(data.quantityInStock.toString()) : (data.stock || 0),
-      isActive: data.isActive && data.inStock,
+      name: data.name.trim(),
+      description: data.description?.trim() || data.shortDescription?.trim() || "",
+      price: data.sellingPrice || data.price || "0",
+      category: data.itemCategory || data.category || "",
+      stock: Number(data.quantityInStock) || Number(data.stock) || 0,
+      isActive: data.isActive !== false && data.inStock !== false,
     };
+
+    console.log("Client: Mapped product data for database:", productData);
 
     if (editingProduct) {
       updateMutation.mutate({ id: editingProduct.id, data: productData });
     } else {
+      console.log("Client: Calling create mutation with data:", productData);
       createMutation.mutate(productData);
     }
   };
@@ -383,6 +411,45 @@ export default function Products() {
     if (confirm("Are you sure you want to delete this product?")) {
       deleteProductMutation.mutate(id);
     }
+  };
+
+  const resetForm = () => {
+    form.reset({
+      name: "",
+      description: "",
+      price: "0",
+      category: "",
+      stock: 0,
+      isActive: true,
+      itemType: "goods",
+      shortDescription: "",
+      unit: "",
+      shortCode: "",
+      displayOrder: "",
+      hsnSacCode: "",
+      orderType: "",
+      itemCategory: "",
+      itemSubCategory: "",
+      additionalCategories: [],
+      inStock: true,
+      sellingPrice: "",
+      discountedPrice: "",
+      taxIncluded: false,
+      gstTax: "GST @ 5%",
+      packagingCharges: "",
+      trackInventory: false,
+      quantityInStock: 0,
+      purchasePrice: "",
+      quantityOrdered: 0,
+      imageUrl: "",
+    });
+    setSelectedCategories([]);
+    setSelectedUnit("");
+    setSelectedOrderType("");
+    setSelectedCategory("");
+    setAvailableSubcategories([]);
+    setCategorization("veg");
+    setAvailableCategories(vegCategories);
   };
 
   const formatDate = (date: string | Date) => {
@@ -909,14 +976,13 @@ export default function Products() {
                       control={form.control}
                       name="quantityInStock"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Quantity in Stock</FormLabel>
+                        <FormItem><FormLabel>Quantity in Stock</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               placeholder="Tap to enter"
                               value={field.value || ""}
-                              onChange={(e) => field.onChange(e.target.value)}
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
                             />
                           </FormControl>
                           <FormMessage />
@@ -956,7 +1022,7 @@ export default function Products() {
                               type="number"
                               placeholder="Tap to enter"
                               value={field.value || ""}
-                              onChange={(e) => field.onChange(e.target.value)}
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
                             />
                           </FormControl>
                           <FormMessage />
@@ -971,14 +1037,7 @@ export default function Products() {
                       variant="outline"
                       onClick={() => {
                         setIsAddDialogOpen(false);
-                        form.reset();
-                        setSelectedCategories([]);
-                        setSelectedUnit("");
-                        setSelectedOrderType("");
-                        setSelectedCategory("");
-                        setAvailableSubcategories([]);
-                        setCategorization("veg");
-                        setAvailableCategories(vegCategories);
+                        resetForm();
                       }}
                     >
                       Cancel
@@ -1245,14 +1304,7 @@ export default function Products() {
                   variant="outline"
                   onClick={() => {
                     setEditingProduct(null);
-                    form.reset();
-                    setSelectedCategories([]);
-                    setSelectedUnit("");
-                    setSelectedOrderType("");
-                    setSelectedCategory("");
-                    setAvailableSubcategories([]);
-                    setCategorization("veg");
-                    setAvailableCategories(vegCategories);
+                    resetForm();
                   }}
                 >
                   Cancel

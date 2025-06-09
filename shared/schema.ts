@@ -174,72 +174,63 @@ export const companies = pgTable("companies", {
 });
 
 // Insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
+export const insertUserSchema = createInsertSchema(users, {
+  email: z.string().email("Invalid email address"),
+  name: z.string().min(1, "Name is required"),
 });
 
-export const insertProductSchema = createInsertSchema(products).omit({
-  id: true,
-  createdAt: true,
+export const insertProductSchema = createInsertSchema(products, {
+  price: z.string().min(1, "Price is required"),
+  stock: z.number().min(0, "Stock must be at least 0"),
 });
 
-export const insertOrderSchema = createInsertSchema(orders).omit({
-  id: true,
-  createdAt: true,
+export const insertOrderSchema = createInsertSchema(orders, {
+  orderNumber: z.string().min(1, "Order number is required"),
+  amount: z.string().min(1, "Amount is required"),
+  userId: z.number().min(1, "User ID is required"),
+  productId: z.number().min(1, "Product ID is required"),
 });
 
-export const insertDashboardStatsSchema = createInsertSchema(dashboardStats).omit({
-  id: true,
-  updatedAt: true,
+export const insertLocationSchema = createInsertSchema(locations, {
+  locationName: z.string().min(1, "Location name is required"),
 });
 
-export const insertRevenueDataSchema = createInsertSchema(revenueData).omit({
-  id: true,
+export const insertCompanySchema = createInsertSchema(companies, {
+  company: z.string().min(1, "Company name is required"),
 });
 
-export const insertActivityDataSchema = createInsertSchema(activityData).omit({
-  id: true,
+export const insertStoreSchema = createInsertSchema(stores, {
+  storeName: z.string().min(1, "Store name is required"),
 });
 
-export const insertLocationSchema = createInsertSchema(locations).omit({
-  id: true,
-  createdAt: true,
+export const insertStoreManagerSchema = createInsertSchema(storeManagers, {
+  userId: z.number().min(1, "User ID is required"),
+  storeId: z.number().min(1, "Store ID is required"),
+  startDate: z.date(),
 });
 
-export const insertStoreSchema = createInsertSchema(stores).omit({
-  id: true,
-  createdAt: true,
+export const insertMenuSchema = createInsertSchema(menus, {
+  itemName: z.string().min(1, "Item name is required"),
+  price: z.string().min(1, "Price is required"),
 });
 
-export const insertMenuSchema = createInsertSchema(menus).omit({
-  id: true,
-  createdAt: true,
+export const insertTransactionSchema = createInsertSchema(transactions, {
+  transactionId: z.string().min(1, "Transaction ID is required"),
+  amount: z.string().min(1, "Amount is required"),
+  totalAmount: z.string().min(1, "Total amount is required"),
 });
 
-export const insertTransactionSchema = createInsertSchema(transactions).omit({
-  id: true,
-  createdAt: true,
+export const insertWalletTopupSchema = createInsertSchema(walletTopups, {
+  topupId: z.string().min(1, "Topup ID is required"),
+  amount: z.string().min(1, "Amount is required"),
+  finalAmount: z.string().min(1, "Final amount is required"),
 });
 
-export const insertWalletTopupSchema = createInsertSchema(walletTopups).omit({
-  id: true,
-  createdAt: true,
-  processedAt: true,
-});
+export const insertDashboardStatsSchema = createInsertSchema(dashboardStats);
+export const insertRevenueDataSchema = createInsertSchema(revenueData);
+export const insertActivityDataSchema = createInsertSchema(activityData);
 
-export const insertStoreManagerSchema = createInsertSchema(storeManagers).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertCompanySchema = createInsertSchema(companies).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-// Types
+// Type exports
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
@@ -248,6 +239,21 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
+
+export type Location = typeof locations.$inferSelect;
+export type InsertLocation = z.infer<typeof insertLocationSchema>;
+
+export type Company = typeof companies.$inferSelect;
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+
+export type Store = typeof stores.$inferSelect;
+export type InsertStore = z.infer<typeof insertStoreSchema>;
+
+export type StoreManager = typeof storeManagers.$inferSelect;
+export type InsertStoreManager = z.infer<typeof insertStoreManagerSchema>;
+
+export type Menu = typeof menus.$inferSelect;
+export type InsertMenu = z.infer<typeof insertMenuSchema>;
 
 export type DashboardStats = typeof dashboardStats.$inferSelect;
 export type InsertDashboardStats = z.infer<typeof insertDashboardStatsSchema>;
@@ -258,29 +264,14 @@ export type InsertRevenueData = z.infer<typeof insertRevenueDataSchema>;
 export type ActivityData = typeof activityData.$inferSelect;
 export type InsertActivityData = z.infer<typeof insertActivityDataSchema>;
 
-export type Location = typeof locations.$inferSelect;
-export type InsertLocation = z.infer<typeof insertLocationSchema>;
-
-export type Store = typeof stores.$inferSelect;
-export type InsertStore = z.infer<typeof insertStoreSchema>;
-
-export type Menu = typeof menus.$inferSelect;
-export type InsertMenu = z.infer<typeof insertMenuSchema>;
-
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 
 export type WalletTopup = typeof walletTopups.$inferSelect;
 export type InsertWalletTopup = z.infer<typeof insertWalletTopupSchema>;
 
-export type StoreManager = typeof storeManagers.$inferSelect;
-export type InsertStoreManager = z.infer<typeof insertStoreManagerSchema>;
-
-export type Company = typeof companies.$inferSelect;
-export type InsertCompany = z.infer<typeof insertCompanySchema>;
-
-// Extended types for API responses
-export type OrderWithUserAndProduct = Order & {
+// Computed types
+export interface OrderWithUserAndProduct extends Order {
   user: User;
   product: Product;
-};
+}

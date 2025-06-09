@@ -144,16 +144,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/products", async (req, res) => {
     try {
+      console.log("Creating product with data:", req.body);
       const storage = await getStorage();
-      const productData = insertProductSchema.parse(req.body);
-      const product = await storage.createProduct(productData);
+      
+      // Clean and prepare the data
+      const cleanData = {
+        name: req.body.name || "",
+        description: req.body.description || "",
+        price: req.body.price || "0",
+        category: req.body.category || "",
+        stock: parseInt(req.body.stock) || 0,
+        isActive: req.body.isActive !== false
+      };
+      
+      console.log("Cleaned data:", cleanData);
+      
+      // Validate the product data
+      const validationResult = insertProductSchema.safeParse(cleanData);
+      if (!validationResult.success) {
+        console.error("Validation failed:", validationResult.error);
+        return res.status(400).json({ 
+          message: "Invalid product data", 
+          errors: validationResult.error.errors 
+        });
+      }
+      
+      const product = await storage.createProduct(validationResult.data);
+      console.log("Product created successfully:", product);
       res.status(201).json(product);
     } catch (error) {
       console.error("Product create error:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid product data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to create product" });
+      res.status(500).json({ message: "Failed to create product", error: error.message });
     }
   });
 

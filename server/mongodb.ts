@@ -18,40 +18,65 @@ let client: MongoClient;
 let db: Db;
 
 export async function connectToDatabase() {
-  if (!client) {
+  if (client && db) {
     try {
-      // Use correct password format
-      const password = "mumtazsolutions2019";
-      const connectionString = `mongodb+srv://mumtazsolutionsali:${password}@cluster0.zlkielc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-      
-      console.log("Connecting to MongoDB Atlas with direct credentials...");
-      
-      client = new MongoClient(connectionString, {
-        maxPoolSize: 10,
-        serverSelectionTimeoutMS: 30000,
-        socketTimeoutMS: 45000,
-        family: 4, // Use IPv4
-      });
-      
-      await client.connect();
-      
-      // Test the connection
-      const admin = client.db("admin");
-      await admin.command({ ping: 1 });
-      
-      db = client.db("neogroup");
-      console.log("Successfully connected to MongoDB Atlas - neogroup database");
-      
-      // Initialize collections - remove problematic unique index on id field
-      await db.collection("locations").createIndex({ locationName: 1 });
-      
+      // Test existing connection
+      await client.db("admin").command({ ping: 1 });
+      console.log("MongoDB: Using existing connection");
       return db;
     } catch (error) {
-      console.error("MongoDB Atlas connection failed:", error);
-      throw error;
+      console.log("MongoDB: Existing connection failed, reconnecting...");
+      client = null;
+      db = null;
     }
   }
-  return db;
+
+  try {
+    // Use correct password format
+    const password = "mumtazsolutions2019";
+    const connectionString = `mongodb+srv://mumtazsolutionsali:${password}@cluster0.zlkielc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+    
+    console.log("MongoDB: Connecting to MongoDB Atlas with direct credentials...");
+    
+    client = new MongoClient(connectionString, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      family: 4, // Use IPv4
+      maxIdleTimeMS: 30000,
+    });
+    
+    await client.connect();
+    console.log("MongoDB: Client connected successfully");
+    
+    // Test the connection
+    const admin = client.db("admin");
+    await admin.command({ ping: 1 });
+    console.log("MongoDB: Connection test successful");
+    
+    db = client.db("neogroup");
+    console.log("MongoDB: Connected to neogroup database");
+    
+    // Test connection to products collection and ensure it exists
+    const productsCollection = db.collection("products");
+    const productCount = await productsCollection.countDocuments();
+    console.log(`MongoDB: Products collection accessible, contains ${productCount} documents`);
+    
+    // Initialize collections
+    try {
+      await db.collection("locations").createIndex({ locationName: 1 });
+      console.log("MongoDB: Indexes created successfully");
+    } catch (indexError) {
+      console.log("MongoDB: Index creation skipped (may already exist)");
+    }
+    
+    return db;
+  } catch (error) {
+    console.error("MongoDB: Connection failed:", error);
+    client = null;
+    db = null;
+    throw error;
+  }
 }
 
 export class MongoStorage implements IStorage {
@@ -84,6 +109,16 @@ export class MongoStorage implements IStorage {
     this.dashboardStatsCollection = database.collection("dashboard_stats");
     this.revenueDataCollection = database.collection("revenue_data");
     this.activityDataCollection = database.collection("activity_data");
+  }
+
+  private async ensureConnection(): Promise<void> {
+    try {
+      // Test the database connection
+      await this.db.admin().ping();
+    } catch (error) {
+      console.error("MongoDB: Connection test failed:", error);
+      throw new Error("Database connection lost");
+    }
   }
 
   // Users
@@ -137,36 +172,111 @@ export class MongoStorage implements IStorage {
   // Products
   async getProducts(): Promise<Product[]> {
     const products = await this.productsCollection.find({}).toArray();
-    return products.map(product => ({ ...product, id: product._id as any }));
+    return products.map(product => ({ 
+      ...product, 
+      id: product.id || parseInt(product._id.toString(), 16) % 1000000,
+      _id: undefined 
+    } as any));
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
-    const product = await this.productsCollection.findOne({ _id: id as any });
-    return product ? { ...product, id: product._id as any } : undefined;
+    const product = await this.productsCollection.findOne({ id: id });
+    return product ? { 
+      ...product, 
+      id: product.id,
+      _id: undefined 
+    } as any : undefined;
   }
 
   async createProduct(insertProduct: InsertProduct): Promise<Product> {
-    const result = await this.productsCollection.insertOne({
-      ...insertProduct,
-      description: insertProduct.description || null,
-      category: insertProduct.category || null,
-      stock: insertProduct.stock || 0,
-      isActive: insertProduct.isActive ?? true,
-      createdAt: new Date()
-    } as any);
+    console.log("MongoDB: Creating product with data:", insertProduct);
     
-    const product = await this.productsCollection.findOne({ _id: result.insertedId });
-    return { ...product!, id: product!._id as any };
+    // Validate required fields
+    if (!insertProduct.name || insertProduct.name.trim() === "") {
+      throw new Error("Product name is required and cannot be empty");
+    }
+    
+    try {
+      // Ensure we're connected to the database
+      await this.ensureConnection();
+      
+      if (!this.productsCollection) {
+        throw new Error("Products collection not initialized");
+      }
+      
+      // Generate a sequential numeric ID for consistency
+      const existingProducts = await this.productsCollection.find({}).sort({ id: -1 }).limit(1).toArray();
+      let nextId = 1;
+      if (existingProducts.length > 0 && existingProducts[0].id) {
+        nextId = existingProducts[0].id + 1;
+      } else {
+        const count = await this.productsCollection.countDocuments();
+        nextId = count + 1;
+      }
+      
+      const productData = {
+        id: nextId, // Add numeric ID for consistent referencing
+        name: insertProduct.name.trim(),
+        description: insertProduct.description?.trim() || null,
+        price: insertProduct.price || "0",
+        category: insertProduct.category?.trim() || null,
+        stock: Number(insertProduct.stock) || 0,
+        isActive: insertProduct.isActive ?? true,
+        createdAt: new Date()
+      };
+      
+      console.log("MongoDB: Inserting product data into neogroup database:", productData);
+      
+      // Insert the product
+      const result = await this.productsCollection.insertOne(productData);
+      console.log("MongoDB: Insert result:", result);
+      
+      if (!result.insertedId) {
+        throw new Error("Failed to insert product - no insertedId returned");
+      }
+      
+      console.log("MongoDB: Product inserted successfully with _id:", result.insertedId, "and id:", nextId);
+      
+      // Verify the product was actually saved by fetching it back using the numeric ID
+      const savedProduct = await this.productsCollection.findOne({ id: nextId });
+      console.log("MongoDB: Verification - Retrieved saved product:", savedProduct);
+      
+      if (!savedProduct) {
+        throw new Error("Product was not saved properly - verification failed");
+      }
+      
+      // Return the product with consistent structure
+      const convertedProduct: Product = {
+        id: savedProduct.id,
+        name: savedProduct.name,
+        description: savedProduct.description,
+        price: savedProduct.price,
+        category: savedProduct.category,
+        stock: savedProduct.stock,
+        isActive: savedProduct.isActive,
+        createdAt: savedProduct.createdAt
+      };
+      
+      console.log("MongoDB: Successfully created and verified product:", convertedProduct);
+      return convertedProduct;
+    } catch (error) {
+      console.error("MongoDB: Error creating product:", error);
+      throw error;
+    }
   }
 
   async updateProduct(id: number, updateData: Partial<InsertProduct>): Promise<Product | undefined> {
-    await this.productsCollection.updateOne({ _id: id as any }, { $set: updateData });
-    const product = await this.productsCollection.findOne({ _id: id as any });
-    return product ? { ...product, id: product._id as any } : undefined;
+    await this.productsCollection.updateOne({ id: id }, { $set: updateData });
+    const product = await this.productsCollection.findOne({ id: id });
+    return product ? { 
+      ...product, 
+      id: product.id,
+      _id: undefined 
+    } as any : undefined;
   }
 
   async deleteProduct(id: number): Promise<boolean> {
-    const result = await this.productsCollection.deleteOne({ _id: id as any });
+    const result = await this.productsCollection.deleteOne({ id: id });
     return result.deletedCount > 0;
   }
 

@@ -703,19 +703,52 @@ export class MemStorage implements IStorage {
 
 import { connectToDatabase, MongoStorage } from "./mongodb";
 
-let storage: IStorage;
+let storage: IStorage | null = null;
+let isConnecting = false;
 
 export async function getStorage(): Promise<IStorage> {
-  if (!storage) {
-    try {
-      const db = await connectToDatabase();
-      storage = new MongoStorage(db);
-      console.log("Using MongoDB storage");
-    } catch (error) {
-      console.warn("MongoDB connection failed, falling back to memory storage:", error instanceof Error ? error.message : String(error));
-      storage = memStorage;
+  // If storage already exists, return it
+  if (storage) return storage;
+  
+  // If already connecting, wait for it to complete
+  if (isConnecting) {
+    while (isConnecting) {
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
+    return storage!;
   }
+
+  isConnecting = true;
+  
+  try {
+    console.log("Storage: Attempting to connect to MongoDB...");
+    const db = await connectToDatabase();
+    
+    if (!db) {
+      throw new Error("Failed to get database instance");
+    }
+    
+    console.log("Storage: MongoDB connected successfully, creating MongoDB storage");
+    const mongoStorage = new MongoStorage(db);
+    
+    // Test the storage by trying to get products
+    try {
+      await mongoStorage.getProducts();
+      console.log("Storage: MongoDB storage test successful - using MongoDB storage");
+      storage = mongoStorage;
+    } catch (testError) {
+      console.error("Storage: MongoDB storage test failed:", testError);
+      throw testError;
+    }
+    
+  } catch (error) {
+    console.error("Storage: MongoDB connection failed, falling back to memory storage:", error.message);
+    console.warn("Storage: WARNING - Using memory storage, data will not persist between server restarts!");
+    storage = new MemStorage();
+  } finally {
+    isConnecting = false;
+  }
+
   return storage;
 }
 

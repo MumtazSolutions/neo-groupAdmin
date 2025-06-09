@@ -293,8 +293,8 @@ export default function Transactions() {
                             </FormControl>
                             <SelectContent>
                               {stores?.map((store) => (
-                                <SelectItem key={store.id} value={store.id.toString()}>
-                                  {store.storeName} ({store.storeCode})
+                                <SelectItem key={store.id} value={store.id?.toString() || ""}>
+                                  {store.storeName || "Unnamed Store"} ({store.storeCode || "No Code"})
                                 </SelectItem>
                               ))}
                             </SelectContent>

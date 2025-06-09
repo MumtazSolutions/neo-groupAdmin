@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Edit, Trash2, Search } from "lucide-react";
@@ -167,7 +166,7 @@ export default function Menus() {
           <h1 className="text-3xl font-bold tracking-tight">Menus</h1>
           <p className="text-muted-foreground">Manage menu items across all stores</p>
         </div>
-        
+
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700">
@@ -209,8 +208,8 @@ export default function Menus() {
                           </FormControl>
                           <SelectContent>
                             {stores?.map((store) => (
-                              <SelectItem key={store.id} value={store.id.toString()}>
-                                {store.storeName}
+                              <SelectItem key={store.id} value={store.id?.toString() || ""}>
+                                {store.storeName || "Unnamed Store"}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -351,7 +350,6 @@ export default function Menus() {
                     </FormItem>
                   )}
                 />
-                </div>
 
                 <FormField
                   control={form.control}

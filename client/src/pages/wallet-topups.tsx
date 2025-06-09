@@ -255,7 +255,7 @@ export default function WalletTopups() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>User</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString() || ""}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select user" />

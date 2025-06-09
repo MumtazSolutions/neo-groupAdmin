@@ -178,8 +178,8 @@ export default function StoreManagers() {
                           </FormControl>
                           <SelectContent>
                             {users?.map((user) => (
-                              <SelectItem key={user.id} value={user.id.toString()}>
-                                {user.name} ({user.email})
+                              <SelectItem key={user.id} value={user.id?.toString() || ""}>
+                                {user.name || "Unknown User"} ({user.email || "No Email"})
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -202,8 +202,8 @@ export default function StoreManagers() {
                           </FormControl>
                           <SelectContent>
                             {stores?.map((store) => (
-                              <SelectItem key={store.id} value={store.id.toString()}>
-                                {store.storeName}
+                              <SelectItem key={store.id} value={store.id?.toString() || ""}>
+                                {store.storeName || "Unnamed Store"}
                               </SelectItem>
                             ))}
                           </SelectContent>

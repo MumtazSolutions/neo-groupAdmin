@@ -66,29 +66,31 @@ function Router() {
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
       
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <Header 
           title={getPageTitle(location)} 
           onMenuClick={openSidebar}
         />
         
-        <main className="flex-1 overflow-y-auto">
-          <Switch>
-            <Route path="/" component={Dashboard} />
-            <Route path="/users" component={Users} />
-            <Route path="/products" component={Products} />
-            <Route path="/orders" component={Orders} />
-            <Route path="/analytics" component={Analytics} />
-            <Route path="/reports" component={Reports} />
-            <Route path="/locations" component={Locations} />
-            <Route path="/companies" component={Companies} />
-            <Route path="/stores" component={Stores} />
-            <Route path="/menus" component={Menus} />
-            <Route path="/transactions" component={Transactions} />
-            <Route path="/wallet-topups" component={WalletTopups} />
-            <Route path="/store-managers" component={StoreManagers} />
-            <Route component={NotFound} />
-          </Switch>
+        <main className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6">
+          <div className="w-full max-w-none">
+            <Switch>
+              <Route path="/" component={Dashboard} />
+              <Route path="/users" component={Users} />
+              <Route path="/products" component={Products} />
+              <Route path="/orders" component={Orders} />
+              <Route path="/analytics" component={Analytics} />
+              <Route path="/reports" component={Reports} />
+              <Route path="/locations" component={Locations} />
+              <Route path="/companies" component={Companies} />
+              <Route path="/stores" component={Stores} />
+              <Route path="/menus" component={Menus} />
+              <Route path="/transactions" component={Transactions} />
+              <Route path="/wallet-topups" component={WalletTopups} />
+              <Route path="/store-managers" component={StoreManagers} />
+              <Route component={NotFound} />
+            </Switch>
+          </div>
         </main>
       </div>
     </div>

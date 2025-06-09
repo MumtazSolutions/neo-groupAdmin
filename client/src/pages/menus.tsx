@@ -18,30 +18,6 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertMenuSchema, type Menu, type InsertMenu, type Store } from "@shared/schema";
 
-const currencies = [
-  { code: "INR", name: "Indian Rupee" },
-  { code: "KES", name: "Kenyan Shilling" },
-  { code: "AED", name: "UAE Dirham" },
-  { code: "PHP", name: "Philippine Peso" },
-  { code: "CAD", name: "Canadian Dollar" },
-  { code: "MYR", name: "Malaysian Ringgit" },
-  { code: "NGN", name: "Nigerian Naira" },
-  { code: "USD", name: "US Dollar" },
-  { code: "SAR", name: "Saudi Riyal" },
-  { code: "BHD", name: "Bahraini Dinar" },
-  { code: "NPR", name: "Nepalese Rupee" },
-  { code: "XCD", name: "East Caribbean Dollar" },
-];
-
-const gstOptions = [
-  { value: "0", label: "GST 0%" },
-  { value: "5", label: "GST 5%" },
-  { value: "10", label: "GST 10%" },
-  { value: "12", label: "GST 12%" },
-  { value: "18", label: "GST 18%" },
-  { value: "28", label: "GST 28%" },
-];
-
 export default function Menus() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingMenu, setEditingMenu] = useState<Menu | null>(null);
@@ -70,7 +46,11 @@ export default function Menus() {
       price: "0",
       currency: "USD",
       isAvailable: true,
-      gst: "10",
+      ingredients: "",
+      allergens: "",
+      nutritionInfo: "",
+      imageUrl: "",
+      preparationTime: 0,
     },
   });
 
@@ -111,20 +91,19 @@ export default function Menus() {
   const handleEditMenu = (menu: Menu) => {
     setEditingMenu(menu);
     form.reset({
-      menuName: menu.menuName,
-      storeId: menu.storeId,
-      category: menu.category,
-      itemName: menu.itemName,
+      menuName: menu.menuName || "",
+      storeId: menu.storeId || 0,
+      category: menu.category || "",
+      itemName: menu.itemName || "",
       description: menu.description || "",
-      price: menu.price,
-      currency: menu.currency,
+      price: menu.price || "0",
+      currency: menu.currency || "USD",
       isAvailable: menu.isAvailable,
       ingredients: menu.ingredients || "",
       allergens: menu.allergens || "",
       nutritionInfo: menu.nutritionInfo || "",
       imageUrl: menu.imageUrl || "",
-      preparationTime: menu.preparationTime || undefined,
-      gst: menu.gst || "10",
+      preparationTime: menu.preparationTime || 0,
     });
   };
 
@@ -146,15 +125,23 @@ export default function Menus() {
     return stores?.find(store => store.id === storeId);
   };
 
-  const getUniqueCategories = () => {
-    if (!menus) return [];
-    return [...new Set(menus.map(menu => menu.category))];
-  };
+  const filteredMenus = menus?.filter((menu) => {
+    const matchesSearch = !searchQuery || 
+      menu.itemName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      menu.menuName?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStore = storeFilter === "all" || menu.storeId.toString() === storeFilter;
+    const matchesCategory = categoryFilter === "all" || menu.category === categoryFilter;
+    const matchesStatus = statusFilter === "all" || 
+      (statusFilter === "available" && menu.isAvailable) ||
+      (statusFilter === "unavailable" && !menu.isAvailable);
+
+    return matchesSearch && matchesStore && matchesCategory && matchesStatus;
+  }) || [];
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-sm text-muted-foreground">Loading menus...</div>
+        <div className="text-sm text-muted-foreground">Loading menu items...</div>
       </div>
     );
   }
@@ -163,8 +150,8 @@ export default function Menus() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Menus</h1>
-          <p className="text-muted-foreground">Manage menu items across all stores</p>
+          <h1 className="text-3xl font-bold tracking-tight">Menu Items</h1>
+          <p className="text-muted-foreground">Manage your restaurant menu items</p>
         </div>
 
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -288,20 +275,9 @@ export default function Menus() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Currency</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select currency" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {currencies.map((currency) => (
-                              <SelectItem key={currency.code} value={currency.code}>
-                                {currency.code} - {currency.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Input placeholder="USD" {...field} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -311,14 +287,43 @@ export default function Menus() {
                     name="preparationTime"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Prep Time (min)</FormLabel>
+                        <FormLabel>Prep Time (mins)</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
-                            placeholder="15"
+                            placeholder="0"
                             value={field.value || ""}
-                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
                           />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="ingredients"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ingredients</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="List ingredients" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="allergens"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Allergens</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="List allergens" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -328,24 +333,13 @@ export default function Menus() {
 
                 <FormField
                   control={form.control}
-                  name="gst"
+                  name="imageUrl"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>GST Rate</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select GST rate" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {gstOptions.map((gst) => (
-                            <SelectItem key={gst.value} value={gst.value}>
-                              {gst.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Image URL</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter image URL" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -412,19 +406,6 @@ export default function Menus() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {getUniqueCategories().map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="All Status" />
@@ -439,114 +420,64 @@ export default function Menus() {
 
       {/* Menu Items Table */}
       <Card>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ITEM</TableHead>
-                <TableHead>STORE</TableHead>
-                <TableHead>CATEGORY</TableHead>
-                <TableHead>PRICE</TableHead>
-                <TableHead>TAX</TableHead>
-                <TableHead>AVAILABILITY</TableHead>
-                <TableHead>ACTIONS</TableHead>
+                <TableHead>Item</TableHead>
+                <TableHead>Store</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {menus && menus.length > 0 ? (
-                menus.map((menu) => {
-                  const store = getStore(menu.storeId);
-                  return (
-                    <TableRow key={menu.id}>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                            <span className="text-orange-600 font-semibold">
-                              {menu.itemName.charAt(0)}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="font-medium">{menu.itemName}</div>
-                            <div className="text-sm text-muted-foreground">{menu.description}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{store?.storeName || "Unknown Store"}</TableCell>
-                      <TableCell>{menu.category}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{menu.currency} {menu.price}</div>
-                          <div className="text-sm text-muted-foreground">Excl. Tax</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-green-600">
-                          GST {menu.gst || 10}%
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            checked={menu.isAvailable}
-                            readOnly
-                            className="rounded"
-                          />
-                          <span>{menu.isAvailable ? "Available" : "Unavailable"}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditMenu(menu)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(menu.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    <p className="text-muted-foreground">No menu items found</p>
-                  </TableCell>
-                </TableRow>
-              )}
+              {filteredMenus.map((menu) => {
+                const store = getStore(menu.storeId);
+                return (
+                  <TableRow key={menu.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{menu.itemName}</div>
+                        <div className="text-sm text-muted-foreground">{menu.menuName}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>{store?.storeName || "Unknown Store"}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{menu.category}</Badge>
+                    </TableCell>
+                    <TableCell>${Number(menu.price).toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Badge variant={menu.isAvailable ? "default" : "secondary"}>
+                        {menu.isAvailable ? "Available" : "Unavailable"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditMenu(menu)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(menu.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Showing 1 to {menus?.length || 0} of {menus?.length || 0} results
-        </p>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" disabled>
-            Previous
-          </Button>
-          <Button variant="outline" size="sm" className="bg-blue-600 text-white">
-            1
-          </Button>
-          <Button variant="outline" size="sm" disabled>
-            Next
-          </Button>
-        </div>
-      </div>
 
       {/* Edit Menu Dialog */}
       <Dialog open={!!editingMenu} onOpenChange={() => setEditingMenu(null)}>
@@ -584,8 +515,8 @@ export default function Menus() {
                         </FormControl>
                         <SelectContent>
                           {stores?.map((store) => (
-                            <SelectItem key={store.id} value={store.id.toString()}>
-                              {store.storeName}
+                            <SelectItem key={store.id} value={store.id?.toString() || ""}>
+                              {store.storeName || "Unnamed Store"}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -664,20 +595,9 @@ export default function Menus() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Currency</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select currency" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {currencies.map((currency) => (
-                            <SelectItem key={currency.code} value={currency.code}>
-                              {currency.code} - {currency.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Input placeholder="USD" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -687,13 +607,13 @@ export default function Menus() {
                   name="preparationTime"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Prep Time (min)</FormLabel>
+                      <FormLabel>Prep Time (mins)</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
-                          placeholder="15"
+                          placeholder="0"
                           value={field.value || ""}
-                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -701,31 +621,6 @@ export default function Menus() {
                   )}
                 />
               </div>
-
-              <FormField
-                control={form.control}
-                name="gst"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>GST Rate</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select GST rate" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {gstOptions.map((gst) => (
-                          <SelectItem key={gst.value} value={gst.value}>
-                            {gst.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <FormField
                 control={form.control}

@@ -1,5 +1,5 @@
 import { 
-  users, products, orders, dashboardStats, revenueData, activityData, locations, companies,
+  users, products, orders, dashboardStats, revenueData, activityData, locations, companies, stores, storeManagers, menus,
   type User, type InsertUser,
   type Product, type InsertProduct,
   type Order, type InsertOrder, type OrderWithUserAndProduct,
@@ -7,7 +7,10 @@ import {
   type RevenueData, type InsertRevenueData,
   type ActivityData, type InsertActivityData,
   type Location, type InsertLocation,
-  type Company, type InsertCompany
+  type Company, type InsertCompany,
+  type Store, type InsertStore,
+  type StoreManager, type InsertStoreManager,
+  type Menu, type InsertMenu
 } from "@shared/schema";
 
 export interface IStorage {
@@ -53,6 +56,27 @@ export interface IStorage {
   createCompany(company: InsertCompany): Promise<Company>;
   updateCompany(id: number, company: Partial<InsertCompany>): Promise<Company | undefined>;
   deleteCompany(id: number): Promise<boolean>;
+
+  // Stores
+  getStores(): Promise<Store[]>;
+  getStore(id: number): Promise<Store | undefined>;
+  createStore(store: InsertStore): Promise<Store>;
+  updateStore(id: number, store: Partial<InsertStore>): Promise<Store | undefined>;
+  deleteStore(id: number): Promise<boolean>;
+
+  // Store Managers
+  getStoreManagers(): Promise<StoreManager[]>;
+  getStoreManager(id: number): Promise<StoreManager | undefined>;
+  createStoreManager(storeManager: InsertStoreManager): Promise<StoreManager>;
+  updateStoreManager(id: number, storeManager: Partial<InsertStoreManager>): Promise<StoreManager | undefined>;
+  deleteStoreManager(id: number): Promise<boolean>;
+
+  // Menus
+  getMenus(): Promise<Menu[]>;
+  getMenu(id: number): Promise<Menu | undefined>;
+  createMenu(menu: InsertMenu): Promise<Menu>;
+  updateMenu(id: number, menu: Partial<InsertMenu>): Promise<Menu | undefined>;
+  deleteMenu(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -61,6 +85,9 @@ export class MemStorage implements IStorage {
   private orders: Map<number, Order>;
   private locations: Map<number, Location>;
   private companies: Map<number, Company>;
+  private stores: Map<number, Store>;
+  private storeManagers: Map<number, StoreManager>;
+  private menus: Map<number, Menu>;
   private dashboardStats!: DashboardStats;
   private revenueData!: RevenueData[];
   private activityData!: ActivityData;
@@ -69,6 +96,9 @@ export class MemStorage implements IStorage {
   private currentOrderId: number;
   private currentLocationId: number;
   private currentCompanyId: number;
+  private currentStoreId: number;
+  private currentStoreManagerId: number;
+  private currentMenuId: number;
 
   constructor() {
     this.users = new Map();
@@ -76,11 +106,17 @@ export class MemStorage implements IStorage {
     this.orders = new Map();
     this.locations = new Map();
     this.companies = new Map();
+    this.stores = new Map();
+    this.storeManagers = new Map();
+    this.menus = new Map();
     this.currentUserId = 1;
     this.currentProductId = 1;
     this.currentOrderId = 1;
     this.currentLocationId = 1;
     this.currentCompanyId = 1;
+    this.currentStoreId = 1;
+    this.currentStoreManagerId = 1;
+    this.currentMenuId = 1;
 
     // Initialize with sample data
     this.initializeData();
@@ -319,7 +355,7 @@ export class MemStorage implements IStorage {
   async updateUser(id: number, updateData: Partial<InsertUser>): Promise<User | undefined> {
     const user = this.users.get(id);
     if (!user) return undefined;
-    
+
     const updatedUser = { ...user, ...updateData };
     this.users.set(id, updatedUser);
     return updatedUser;
@@ -357,7 +393,7 @@ export class MemStorage implements IStorage {
   async updateProduct(id: number, updateData: Partial<InsertProduct>): Promise<Product | undefined> {
     const product = this.products.get(id);
     if (!product) return undefined;
-    
+
     const updatedProduct = { ...product, ...updateData };
     this.products.set(id, updatedProduct);
     return updatedProduct;
@@ -380,7 +416,7 @@ export class MemStorage implements IStorage {
   async getOrder(id: number): Promise<OrderWithUserAndProduct | undefined> {
     const order = this.orders.get(id);
     if (!order) return undefined;
-    
+
     return {
       ...order,
       user: this.users.get(order.userId)!,
@@ -413,7 +449,7 @@ export class MemStorage implements IStorage {
   async updateOrder(id: number, updateData: Partial<InsertOrder>): Promise<Order | undefined> {
     const order = this.orders.get(id);
     if (!order) return undefined;
-    
+
     const updatedOrder = { ...order, ...updateData };
     this.orders.set(id, updatedOrder);
     return updatedOrder;
@@ -476,7 +512,7 @@ export class MemStorage implements IStorage {
   async updateLocation(id: number, updateData: Partial<InsertLocation>): Promise<Location | undefined> {
     const location = this.locations.get(id);
     if (!location) return undefined;
-    
+
     const updatedLocation = { ...location, ...updateData };
     this.locations.set(id, updatedLocation);
     return updatedLocation;
@@ -515,7 +551,7 @@ export class MemStorage implements IStorage {
   async updateCompany(id: number, updateData: Partial<InsertCompany>): Promise<Company | undefined> {
     const company = this.companies.get(id);
     if (!company) return undefined;
-    
+
     const updatedCompany = { 
       ...company, 
       ...updateData, 
@@ -527,6 +563,141 @@ export class MemStorage implements IStorage {
 
   async deleteCompany(id: number): Promise<boolean> {
     return this.companies.delete(id);
+  }
+
+  // Stores
+  async getStores(): Promise<Store[]> {
+    return Array.from(this.stores.values());
+  }
+
+  async getStore(id: number): Promise<Store | undefined> {
+    return this.stores.get(id);
+  }
+
+  async createStore(insertStore: InsertStore): Promise<Store> {
+    const id = this.currentStoreId++;
+    const store: Store = {
+      id,
+      storeName: insertStore.storeName,
+      storeCode: insertStore.storeCode,
+      locationId: insertStore.locationId || null,
+      managerId: insertStore.managerId || null,
+      address: insertStore.address,
+      city: insertStore.city,
+      stateProvince: insertStore.stateProvince,
+      zipPostalCode: insertStore.zipPostalCode,
+      country: insertStore.country,
+      currency: insertStore.currency,
+      phone: insertStore.phone || null,
+      email: insertStore.email || null,
+      status: insertStore.status || "active",
+      description: insertStore.description || null,
+      createdAt: new Date(),
+    };
+    this.stores.set(id, store);
+    return store;
+  }
+
+  async updateStore(id: number, updateData: Partial<InsertStore>): Promise<Store | undefined> {
+    const store = this.stores.get(id);
+    if (!store) return undefined;
+
+    const updatedStore = { ...store, ...updateData };
+    this.stores.set(id, updatedStore);
+    return updatedStore;
+  }
+
+  async deleteStore(id: number): Promise<boolean> {
+    return this.stores.delete(id);
+  }
+
+  // Store Managers
+  async getStoreManagers(): Promise<StoreManager[]> {
+    return Array.from(this.storeManagers.values());
+  }
+
+  async getStoreManager(id: number): Promise<StoreManager | undefined> {
+    return this.storeManagers.get(id);
+  }
+
+  async createStoreManager(insertStoreManager: InsertStoreManager): Promise<StoreManager> {
+    const id = this.currentStoreManagerId++;
+    const storeManager: StoreManager = {
+      id,
+      userId: insertStoreManager.userId,
+      storeId: insertStoreManager.storeId,
+      role: insertStoreManager.role || "manager",
+      permissions: insertStoreManager.permissions || null,
+      startDate: insertStoreManager.startDate,
+      endDate: insertStoreManager.endDate || null,
+      isActive: insertStoreManager.isActive ?? true,
+      salary: insertStoreManager.salary || null,
+      currency: insertStoreManager.currency || null,
+      contactNumber: insertStoreManager.contactNumber || null,
+      emergencyContact: insertStoreManager.emergencyContact || null,
+      notes: insertStoreManager.notes || null,
+      createdAt: new Date(),
+    };
+    this.storeManagers.set(id, storeManager);
+    return storeManager;
+  }
+
+  async updateStoreManager(id: number, updateData: Partial<InsertStoreManager>): Promise<StoreManager | undefined> {
+    const storeManager = this.storeManagers.get(id);
+    if (!storeManager) return undefined;
+
+    const updatedStoreManager = { ...storeManager, ...updateData };
+    this.storeManagers.set(id, updatedStoreManager);
+    return updatedStoreManager;
+  }
+
+  async deleteStoreManager(id: number): Promise<boolean> {
+    return this.storeManagers.delete(id);
+  }
+
+  // Menus
+  async getMenus(): Promise<Menu[]> {
+    return Array.from(this.menus.values());
+  }
+
+  async getMenu(id: number): Promise<Menu | undefined> {
+    return this.menus.get(id);
+  }
+
+  async createMenu(insertMenu: InsertMenu): Promise<Menu> {
+    const id = this.currentMenuId++;
+    const menu: Menu = {
+      id,
+      menuName: insertMenu.menuName,
+      storeId: insertMenu.storeId,
+      category: insertMenu.category,
+      itemName: insertMenu.itemName,
+      description: insertMenu.description || null,
+      price: insertMenu.price,
+      currency: insertMenu.currency,
+      isAvailable: insertMenu.isAvailable ?? true,
+      ingredients: insertMenu.ingredients || null,
+      allergens: insertMenu.allergens || null,
+      nutritionInfo: insertMenu.nutritionInfo || null,
+      imageUrl: insertMenu.imageUrl || null,
+      preparationTime: insertMenu.preparationTime || null,
+      createdAt: new Date(),
+    };
+    this.menus.set(id, menu);
+    return menu;
+  }
+
+  async updateMenu(id: number, updateData: Partial<InsertMenu>): Promise<Menu | undefined> {
+    const menu = this.menus.get(id);
+    if (!menu) return undefined;
+
+    const updatedMenu = { ...menu, ...updateData };
+    this.menus.set(id, updatedMenu);
+    return updatedMenu;
+  }
+
+  async deleteMenu(id: number): Promise<boolean> {
+    return this.menus.delete(id);
   }
 }
 

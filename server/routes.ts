@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { getStorage } from "./storage";
 import { z } from "zod";
-import { insertUserSchema, insertProductSchema, insertOrderSchema, insertLocationSchema, insertCompanySchema } from "@shared/schema";
+import { insertUserSchema, insertProductSchema, insertOrderSchema, insertLocationSchema, insertCompanySchema, insertStoreManagerSchema, insertStoreSchema, insertMenuSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard Stats
@@ -356,8 +356,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Companies routes
-  app.get("/api/companies", async (_req: Request, res: Response) => {
+  app.get("/api/companies", async (req, res) => {
     try {
+      const storage = await getStorage();
       const companies = await storage.getCompanies();
       res.json(companies);
     } catch (error) {
@@ -366,8 +367,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/companies/:id", async (req: Request, res: Response) => {
+  app.get("/api/companies/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid company ID" });
@@ -385,8 +387,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/companies", async (req: Request, res: Response) => {
+  app.post("/api/companies", async (req, res) => {
     try {
+      const storage = await getStorage();
       const result = insertCompanySchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ 
@@ -403,8 +406,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/companies/:id", async (req: Request, res: Response) => {
+  app.patch("/api/companies/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid company ID" });
@@ -430,8 +434,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/companies/:id", async (req: Request, res: Response) => {
+  app.delete("/api/companies/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid company ID" });
@@ -445,6 +450,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Company delete error:", error);
       res.status(500).json({ message: "Failed to delete company" });
+    }
+  });
+
+  // Store managers routes
+  app.get("/api/store-managers", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const storeManagers = await storage.getStoreManagers();
+      res.json(storeManagers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch store managers" });
+    }
+  });
+
+  app.post("/api/store-managers", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const result = insertStoreManagerSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid store manager data", 
+          errors: result.error.issues 
+        });
+      }
+      const storeManager = await storage.createStoreManager(result.data);
+      res.status(201).json(storeManager);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create store manager" });
+    }
+  });
+
+  app.patch("/api/store-managers/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const id = parseInt(req.params.id);
+      const result = insertStoreManagerSchema.partial().safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid store manager data", 
+          errors: result.error.issues 
+        });
+      }
+      const storeManager = await storage.updateStoreManager(id, result.data);
+      if (!storeManager) {
+        return res.status(404).json({ message: "Store manager not found" });
+      }
+      res.json(storeManager);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update store manager" });
+    }
+  });
+
+  app.delete("/api/store-managers/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteStoreManager(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Store manager not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete store manager" });
+    }
+  });
+
+  // Stores routes
+  app.get("/api/stores", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const stores = await storage.getStores();
+      res.json(stores);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch stores" });
+    }
+  });
+
+  app.post("/api/stores", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const result = insertStoreSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid store data", 
+          errors: result.error.issues 
+        });
+      }
+      const store = await storage.createStore(result.data);
+      res.status(201).json(store);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create store" });
+    }
+  });
+
+  app.patch("/api/stores/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const id = parseInt(req.params.id);
+      const result = insertStoreSchema.partial().safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid store data", 
+          errors: result.error.issues 
+        });
+      }
+      const store = await storage.updateStore(id, result.data);
+      if (!store) {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      res.json(store);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update store" });
+    }
+  });
+
+  app.delete("/api/stores/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteStore(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete store" });
+    }
+  });
+
+  // Menus routes
+  app.get("/api/menus", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const menus = await storage.getMenus();
+      res.json(menus);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch menus" });
+    }
+  });
+
+  app.post("/api/menus", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const result = insertMenuSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid menu data", 
+          errors: result.error.issues 
+        });
+      }
+      const menu = await storage.createMenu(result.data);
+      res.status(201).json(menu);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create menu" });
+    }
+  });
+
+  app.patch("/api/menus/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const id = parseInt(req.params.id);
+      const result = insertMenuSchema.partial().safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid menu data", 
+          errors: result.error.issues 
+        });
+      }
+      const menu = await storage.updateMenu(id, result.data);
+      if (!menu) {
+        return res.status(404).json({ message: "Menu not found" });
+      }
+      res.json(menu);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update menu" });
+    }
+  });
+
+  app.delete("/api/menus/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteMenu(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Menu not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete menu" });
     }
   });
 

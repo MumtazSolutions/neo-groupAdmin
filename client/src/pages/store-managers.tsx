@@ -1,78 +1,35 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Plus, Edit, Trash2, Search, Users, CheckCircle, Store as StoreIcon, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
-import { Plus, Search, Edit, Trash2, UserCheck } from "lucide-react";
-import type { StoreManager, InsertStoreManager, Store as StoreType, User } from "@shared/schema";
-import { insertStoreManagerSchema } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-
-const managerRoles = ["manager", "supervisor", "assistant_manager", "team_lead"];
-
-const currencies = [
-  { code: "INR", name: "Indian Rupee" },
-  { code: "KES", name: "Kenyan Shilling" },
-  { code: "AED", name: "UAE Dirham" },
-  { code: "PHP", name: "Philippine Peso" },
-  { code: "CAD", name: "Canadian Dollar" },
-  { code: "MYR", name: "Malaysian Ringgit" },
-  { code: "NGN", name: "Nigerian Naira" },
-  { code: "USD", name: "US Dollar" },
-  { code: "SAR", name: "Saudi Riyal" },
-  { code: "BHD", name: "Bahraini Dinar" },
-  { code: "NPR", name: "Nepalese Rupee" },
-  { code: "XCD", name: "East Caribbean Dollar" },
-];
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { insertStoreManagerSchema, type StoreManager, type InsertStoreManager, type Store, type User } from "@shared/schema";
 
 export default function StoreManagers() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingManager, setEditingManager] = useState<StoreManager | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
 
-  const { data: managers, isLoading } = useQuery<StoreManager[]>({
+  const { data: storeManagers, isLoading } = useQuery<StoreManager[]>({
     queryKey: ["/api/store-managers"],
   });
 
-  const { data: stores } = useQuery<StoreType[]>({
+  const { data: stores } = useQuery<Store[]>({
     queryKey: ["/api/stores"],
   });
 
@@ -83,105 +40,47 @@ export default function StoreManagers() {
   const form = useForm<InsertStoreManager>({
     resolver: zodResolver(insertStoreManagerSchema),
     defaultValues: {
-      userId: undefined,
-      storeId: undefined,
+      userId: 0,
+      storeId: 0,
       role: "manager",
-      permissions: "",
-      startDate: "",
-      endDate: "",
+      startDate: new Date(),
       isActive: true,
-      salary: "",
-      currency: "",
-      contactNumber: "",
-      emergencyContact: "",
-      notes: "",
     },
   });
 
-  const createManagerMutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: async (data: InsertStoreManager) => {
-      await apiRequest("POST", "/api/store-managers", data);
+      return await apiRequest("POST", "/api/store-managers", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/store-managers"] });
+      toast({ title: "Store manager created successfully" });
+      setIsAddDialogOpen(false);
       form.reset();
-      setIsDialogOpen(false);
-      setEditingManager(null);
-      toast({
-        title: "Success",
-        description: "Store manager saved successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to save store manager",
-        variant: "destructive",
-      });
     },
   });
 
-  const updateManagerMutation = useMutation({
+  const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: InsertStoreManager }) => {
-      await apiRequest("PUT", `/api/store-managers/${id}`, data);
+      return await apiRequest("PATCH", `/api/store-managers/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/store-managers"] });
-      form.reset();
-      setIsDialogOpen(false);
+      toast({ title: "Store manager updated successfully" });
       setEditingManager(null);
-      toast({
-        title: "Success",
-        description: "Store manager updated successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update store manager",
-        variant: "destructive",
-      });
+      form.reset();
     },
   });
 
-  const deleteManagerMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/store-managers/${id}`);
+      return await apiRequest("DELETE", `/api/store-managers/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/store-managers"] });
-      toast({
-        title: "Success",
-        description: "Store manager deleted successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete store manager",
-        variant: "destructive",
-      });
+      toast({ title: "Store manager deleted successfully" });
     },
   });
-
-  const filteredManagers =
-    managers?.filter(
-      (manager) => {
-        const user = users?.find(u => u.id === manager.userId);
-        const store = stores?.find(s => s.id === manager.storeId);
-        return (
-          user?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          store?.storeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          manager.role.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      }
-    ) || [];
-
-  const handleAddManager = () => {
-    setEditingManager(null);
-    form.reset();
-    setIsDialogOpen(true);
-  };
 
   const handleEditManager = (manager: StoreManager) => {
     setEditingManager(manager);
@@ -189,131 +88,98 @@ export default function StoreManagers() {
       userId: manager.userId,
       storeId: manager.storeId,
       role: manager.role,
-      permissions: manager.permissions || "",
-      startDate: manager.startDate ? new Date(manager.startDate).toISOString().split('T')[0] : "",
-      endDate: manager.endDate ? new Date(manager.endDate).toISOString().split('T')[0] : "",
+      startDate: manager.startDate,
+      endDate: manager.endDate || undefined,
       isActive: manager.isActive,
-      salary: manager.salary || "",
-      currency: manager.currency || "",
-      contactNumber: manager.contactNumber || "",
-      emergencyContact: manager.emergencyContact || "",
-      notes: manager.notes || "",
+      salary: manager.salary || undefined,
+      currency: manager.currency || undefined,
+      contactNumber: manager.contactNumber || undefined,
+      emergencyContact: manager.emergencyContact || undefined,
+      notes: manager.notes || undefined,
     });
-    setIsDialogOpen(true);
-  };
-
-  const handleDeleteManager = (id: number) => {
-    if (confirm("Are you sure you want to delete this store manager?")) {
-      deleteManagerMutation.mutate(id);
-    }
   };
 
   const onSubmit = (data: InsertStoreManager) => {
     if (editingManager) {
-      updateManagerMutation.mutate({ id: editingManager.id, data });
+      updateMutation.mutate({ id: editingManager.id, data });
     } else {
-      createManagerMutation.mutate(data);
+      createMutation.mutate(data);
     }
   };
 
-  const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+  const handleDelete = async (id: number) => {
+    if (confirm("Are you sure you want to delete this store manager?")) {
+      deleteMutation.mutate(id);
+    }
   };
 
+  const getManagerUser = (userId: number) => {
+    return users?.find(user => user.id === userId);
+  };
+
+  const getManagerStore = (storeId: number) => {
+    return stores?.find(store => store.id === storeId);
+  };
+
+  const getStatsData = () => {
+    if (!storeManagers) return { total: 0, active: 0, storesManaged: 0, unassigned: 0 };
+    
+    const total = storeManagers.length;
+    const active = storeManagers.filter(m => m.isActive).length;
+    const storesManaged = new Set(storeManagers.map(m => m.storeId)).size;
+    const unassigned = (stores?.length || 0) - storesManaged;
+
+    return { total, active, storesManaged, unassigned };
+  };
+
+  const stats = getStatsData();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-sm text-muted-foreground">Loading store managers...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Store Manager Management
-          </h1>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={handleAddManager} className="bg-indigo-600 hover:bg-indigo-700">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Store Manager
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingManager ? "Edit Store Manager" : "Add New Store Manager"}
-                </DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="userId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>User</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select user" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {users?.map((user) => (
-                                <SelectItem key={user.id} value={user.id.toString()}>
-                                  {user.name} ({user.email})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="storeId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Store</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select store" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {stores?.map((store) => (
-                                <SelectItem key={store.id} value={store.id.toString()}>
-                                  {store.storeName} ({store.storeCode})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Store Managers</h1>
+          <p className="text-muted-foreground">Create and assign store managers to locations</p>
+        </div>
+        
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Manager
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add New Store Manager</DialogTitle>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="role"
+                    name="userId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Role</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <FormLabel>User</FormLabel>
+                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select role" />
+                              <SelectValue placeholder="Select user" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {managerRoles.map((role) => (
-                              <SelectItem key={role} value={role}>
-                                {role.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase())}
+                            {users?.map((user) => (
+                              <SelectItem key={user.id} value={user.id.toString()}>
+                                {user.name} ({user.email})
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -322,332 +188,433 @@ export default function StoreManagers() {
                       </FormItem>
                     )}
                   />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="startDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Start Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="endDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>End Date (Optional)</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="salary"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Salary (Optional)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="0.00" type="number" step="0.01" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="currency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Currency</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select currency" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {currencies.map((currency) => (
-                                <SelectItem key={currency.code} value={currency.code}>
-                                  {currency.code} - {currency.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="contactNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contact Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter contact number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="emergencyContact"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Emergency Contact</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter emergency contact" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
                   <FormField
                     control={form.control}
-                    name="isActive"
+                    name="storeId"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Active</FormLabel>
-                          <div className="text-sm text-muted-foreground">
-                            Is this manager currently active?
-                          </div>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
+                      <FormItem>
+                        <FormLabel>Store</FormLabel>
+                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select store" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {stores?.map((store) => (
+                              <SelectItem key={store.id} value={store.id.toString()}>
+                                {store.storeName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
+                </div>
 
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="manager">Manager</SelectItem>
+                          <SelectItem value="supervisor">Supervisor</SelectItem>
+                          <SelectItem value="assistant_manager">Assistant Manager</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="permissions"
+                    name="contactNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Permissions (JSON)</FormLabel>
+                        <FormLabel>Contact Number</FormLabel>
                         <FormControl>
-                          <Textarea
-                            placeholder='{"read": true, "write": true, "admin": false}'
-                            rows={3}
-                            {...field}
+                          <Input placeholder="Enter contact number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="salary"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Salary</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Enter salary"
+                            value={field.value || ""}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                </div>
 
-                  <FormField
-                    control={form.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter notes (optional)"
-                            rows={3}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex justify-end space-x-2 pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={
-                        createManagerMutation.isPending ||
-                        updateManagerMutation.isPending
-                      }
-                    >
-                      {editingManager ? "Update Manager" : "Save Manager"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Search store managers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setIsAddDialogOpen(false);
+                      form.reset();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={createMutation.isPending}>
+                    {createMutation.isPending ? "Creating..." : "Create Manager"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-            All Store Managers ({filteredManagers.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50 dark:bg-gray-900/50">
-                  <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Manager
-                  </TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Store
-                  </TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Role
-                  </TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Start Date
-                  </TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Contact
-                  </TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Status
-                  </TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading
-                  ? [...Array(5)].map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <Skeleton className="h-10 w-48" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-32" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-24" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-24" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-32" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-20" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-20" />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  : filteredManagers.map((manager) => (
-                      <TableRow
-                        key={manager.id}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="flex items-center p-6">
+            <Users className="h-8 w-8 text-blue-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-muted-foreground">Total Managers</p>
+              <div className="flex items-center">
+                <p className="text-2xl font-bold">{stats.total}</p>
+                <span className="ml-2 text-xs text-green-600">+2 this month</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center p-6">
+            <CheckCircle className="h-8 w-8 text-green-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-muted-foreground">Active</p>
+              <div className="flex items-center">
+                <p className="text-2xl font-bold">{stats.active}</p>
+                <span className="ml-2 text-xs text-green-600">83% active rate</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center p-6">
+            <StoreIcon className="h-8 w-8 text-purple-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-muted-foreground">Stores Managed</p>
+              <div className="flex items-center">
+                <p className="text-2xl font-bold">{stats.storesManaged}</p>
+                <span className="ml-2 text-xs text-blue-600">2.3 avg per manager</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center p-6">
+            <AlertTriangle className="h-8 w-8 text-orange-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-muted-foreground">Unassigned</p>
+              <div className="flex items-center">
+                <p className="text-2xl font-bold">{stats.unassigned}</p>
+                <span className="ml-2 text-xs text-orange-600">Needs attention</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="flex items-center space-x-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            placeholder="Search managers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={locationFilter} onValueChange={setLocationFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Locations" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Locations</SelectItem>
+            {stores?.map((store) => (
+              <SelectItem key={store.id} value={store.id.toString()}>
+                {store.storeName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Managers Grid */}
+      <div className="grid gap-6">
+        {storeManagers && storeManagers.length > 0 ? (
+          storeManagers.map((manager) => {
+            const user = getManagerUser(manager.userId);
+            const store = getManagerStore(manager.storeId);
+            
+            return (
+              <Card key={manager.id}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={user?.avatar} />
+                        <AvatarFallback className="bg-blue-100 text-blue-600">
+                          {user?.name?.substring(0, 2).toUpperCase() || "??"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="text-lg font-semibold">{user?.name || "Unknown User"}</h3>
+                        <p className="text-sm text-muted-foreground">{user?.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditManager(manager)}
                       >
-                        <TableCell>
-                          <div className="flex items-center">
-                            <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center mr-3">
-                              <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                            </div>
-                            <div>
-                              <div className="font-medium text-gray-900 dark:text-white">
-                                {users?.find(u => u.id === manager.userId)?.name || "N/A"}
-                              </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {users?.find(u => u.id === manager.userId)?.email || "N/A"}
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-gray-900 dark:text-white">
-                          {stores?.find(s => s.id === manager.storeId)?.storeName || "N/A"}
-                        </TableCell>
-                        <TableCell>
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                            {manager.role.replace("_", " ")}
+                        <Edit className="w-4 h-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(manager.id)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 grid grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Store</Label>
+                      <p className="text-sm">{store?.storeName || "Unknown Store"}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Role</Label>
+                      <p className="text-sm capitalize">{manager.role}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                      <Badge variant={manager.isActive ? "default" : "secondary"}>
+                        {manager.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {store && (
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-muted-foreground">
+                          Assigned Stores: <span className="font-medium text-blue-600">
+                            {store.storeName}
                           </span>
-                        </TableCell>
-                        <TableCell className="text-gray-900 dark:text-white">
-                          {formatDate(manager.startDate)}
-                        </TableCell>
-                        <TableCell className="text-gray-900 dark:text-white">
-                          {manager.contactNumber || "N/A"}
-                        </TableCell>
-                        <TableCell>
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            manager.isActive 
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                          }`}>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button variant="ghost" size="sm" className="text-green-600">
                             {manager.isActive ? "Active" : "Inactive"}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditManager(manager)}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteManager(manager.id)}
-                              disabled={deleteManagerMutation.isPending}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-blue-600">
+                            Manage Stores
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-blue-600">
+                            Assign Stores
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })
+        ) : (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-muted-foreground">No store managers found</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Edit Manager Dialog */}
+      <Dialog open={!!editingManager} onOpenChange={() => setEditingManager(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Store Manager</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="userId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>User</FormLabel>
+                      <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select user" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {users?.map((user) => (
+                            <SelectItem key={user.id} value={user.id.toString()}>
+                              {user.name} ({user.email})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="storeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Store</FormLabel>
+                      <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select store" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {stores?.map((store) => (
+                            <SelectItem key={store.id} value={store.id.toString()}>
+                              {store.storeName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="supervisor">Supervisor</SelectItem>
+                        <SelectItem value="assistant_manager">Assistant Manager</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="contactNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter contact number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="salary"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Salary</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Enter salary"
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setEditingManager(null);
+                    form.reset();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? "Updating..." : "Update Manager"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

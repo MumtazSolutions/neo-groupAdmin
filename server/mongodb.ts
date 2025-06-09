@@ -6,7 +6,11 @@ import type {
   DashboardStats, InsertDashboardStats,
   RevenueData, InsertRevenueData,
   ActivityData, InsertActivityData,
-  Location, InsertLocation
+  Location, InsertLocation,
+  Company, InsertCompany,
+  Store, InsertStore,
+  StoreManager, InsertStoreManager,
+  Menu, InsertMenu
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -56,6 +60,10 @@ export class MongoStorage implements IStorage {
   private productsCollection: Collection<Product>;
   private ordersCollection: Collection<Order>;
   private locationsCollection: Collection<Location>;
+  private companiesCollection: Collection<Company>;
+  private storesCollection: Collection<Store>;
+  private storeManagersCollection: Collection<StoreManager>;
+  private menusCollection: Collection<Menu>;
   private dashboardStatsCollection: Collection<DashboardStats>;
   private revenueDataCollection: Collection<RevenueData>;
   private activityDataCollection: Collection<ActivityData>;
@@ -69,6 +77,10 @@ export class MongoStorage implements IStorage {
     this.productsCollection = database.collection("products");
     this.ordersCollection = database.collection("orders");
     this.locationsCollection = database.collection("locations");
+    this.companiesCollection = database.collection("companies");
+    this.storesCollection = database.collection("stores");
+    this.storeManagersCollection = database.collection("store_managers");
+    this.menusCollection = database.collection("menus");
     this.dashboardStatsCollection = database.collection("dashboard_stats");
     this.revenueDataCollection = database.collection("revenue_data");
     this.activityDataCollection = database.collection("activity_data");
@@ -401,6 +413,219 @@ export class MongoStorage implements IStorage {
 
   async deleteLocation(id: number): Promise<boolean> {
     const result = await this.locationsCollection.deleteOne({ id: id });
+    return result.deletedCount > 0;
+  }
+
+  // Companies
+  async getCompanies(): Promise<Company[]> {
+    const companies = await this.companiesCollection.find({}).toArray();
+    return companies.map(company => ({ 
+      ...company, 
+      id: typeof company.id === 'number' ? company.id : parseInt(company._id.toString(), 16) % 1000000,
+      _id: undefined 
+    } as any));
+  }
+
+  async getCompany(id: number): Promise<Company | undefined> {
+    const company = await this.companiesCollection.findOne({ id: id });
+    return company ? { ...company, id: company.id } : undefined;
+  }
+
+  async createCompany(insertCompany: InsertCompany): Promise<Company> {
+    const maxIdDoc = await this.companiesCollection.find({}).sort({ id: -1 }).limit(1).toArray();
+    let id = 1;
+    
+    if (maxIdDoc.length > 0 && typeof maxIdDoc[0].id === 'number' && !isNaN(maxIdDoc[0].id)) {
+      id = maxIdDoc[0].id + 1;
+    } else {
+      const count = await this.companiesCollection.countDocuments();
+      id = count + 1;
+    }
+    
+    const company: Company = {
+      ...insertCompany,
+      id,
+      locations: insertCompany.locations || null,
+      rollover: insertCompany.rollover || false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    } as any;
+    
+    await this.companiesCollection.insertOne(company as any);
+    return company;
+  }
+
+  async updateCompany(id: number, updateData: Partial<InsertCompany>): Promise<Company | undefined> {
+    await this.companiesCollection.updateOne({ id: id }, { $set: { ...updateData, updatedAt: new Date() } });
+    const company = await this.companiesCollection.findOne({ id: id });
+    return company ? { ...company, id: company.id } : undefined;
+  }
+
+  async deleteCompany(id: number): Promise<boolean> {
+    const result = await this.companiesCollection.deleteOne({ id: id });
+    return result.deletedCount > 0;
+  }
+
+  // Stores
+  async getStores(): Promise<Store[]> {
+    const stores = await this.storesCollection.find({}).toArray();
+    return stores.map(store => ({ 
+      ...store, 
+      id: typeof store.id === 'number' ? store.id : parseInt(store._id.toString(), 16) % 1000000,
+      _id: undefined 
+    } as any));
+  }
+
+  async getStore(id: number): Promise<Store | undefined> {
+    const store = await this.storesCollection.findOne({ id: id });
+    return store ? { ...store, id: store.id } : undefined;
+  }
+
+  async createStore(insertStore: InsertStore): Promise<Store> {
+    const maxIdDoc = await this.storesCollection.find({}).sort({ id: -1 }).limit(1).toArray();
+    let id = 1;
+    
+    if (maxIdDoc.length > 0 && typeof maxIdDoc[0].id === 'number' && !isNaN(maxIdDoc[0].id)) {
+      id = maxIdDoc[0].id + 1;
+    } else {
+      const count = await this.storesCollection.countDocuments();
+      id = count + 1;
+    }
+    
+    const store: Store = {
+      ...insertStore,
+      id,
+      locationId: insertStore.locationId || null,
+      managerId: insertStore.managerId || null,
+      phone: insertStore.phone || null,
+      email: insertStore.email || null,
+      status: insertStore.status || "active",
+      description: insertStore.description || null,
+      createdAt: new Date()
+    } as any;
+    
+    await this.storesCollection.insertOne(store as any);
+    return store;
+  }
+
+  async updateStore(id: number, updateData: Partial<InsertStore>): Promise<Store | undefined> {
+    await this.storesCollection.updateOne({ id: id }, { $set: updateData });
+    const store = await this.storesCollection.findOne({ id: id });
+    return store ? { ...store, id: store.id } : undefined;
+  }
+
+  async deleteStore(id: number): Promise<boolean> {
+    const result = await this.storesCollection.deleteOne({ id: id });
+    return result.deletedCount > 0;
+  }
+
+  // Store Managers
+  async getStoreManagers(): Promise<StoreManager[]> {
+    const storeManagers = await this.storeManagersCollection.find({}).toArray();
+    return storeManagers.map(storeManager => ({ 
+      ...storeManager, 
+      id: typeof storeManager.id === 'number' ? storeManager.id : parseInt(storeManager._id.toString(), 16) % 1000000,
+      _id: undefined 
+    } as any));
+  }
+
+  async getStoreManager(id: number): Promise<StoreManager | undefined> {
+    const storeManager = await this.storeManagersCollection.findOne({ id: id });
+    return storeManager ? { ...storeManager, id: storeManager.id } : undefined;
+  }
+
+  async createStoreManager(insertStoreManager: InsertStoreManager): Promise<StoreManager> {
+    const maxIdDoc = await this.storeManagersCollection.find({}).sort({ id: -1 }).limit(1).toArray();
+    let id = 1;
+    
+    if (maxIdDoc.length > 0 && typeof maxIdDoc[0].id === 'number' && !isNaN(maxIdDoc[0].id)) {
+      id = maxIdDoc[0].id + 1;
+    } else {
+      const count = await this.storeManagersCollection.countDocuments();
+      id = count + 1;
+    }
+    
+    const storeManager: StoreManager = {
+      ...insertStoreManager,
+      id,
+      role: insertStoreManager.role || "manager",
+      permissions: insertStoreManager.permissions || null,
+      endDate: insertStoreManager.endDate || null,
+      isActive: insertStoreManager.isActive ?? true,
+      salary: insertStoreManager.salary || null,
+      currency: insertStoreManager.currency || null,
+      contactNumber: insertStoreManager.contactNumber || null,
+      emergencyContact: insertStoreManager.emergencyContact || null,
+      notes: insertStoreManager.notes || null,
+      createdAt: new Date()
+    } as any;
+    
+    await this.storeManagersCollection.insertOne(storeManager as any);
+    return storeManager;
+  }
+
+  async updateStoreManager(id: number, updateData: Partial<InsertStoreManager>): Promise<StoreManager | undefined> {
+    await this.storeManagersCollection.updateOne({ id: id }, { $set: updateData });
+    const storeManager = await this.storeManagersCollection.findOne({ id: id });
+    return storeManager ? { ...storeManager, id: storeManager.id } : undefined;
+  }
+
+  async deleteStoreManager(id: number): Promise<boolean> {
+    const result = await this.storeManagersCollection.deleteOne({ id: id });
+    return result.deletedCount > 0;
+  }
+
+  // Menus
+  async getMenus(): Promise<Menu[]> {
+    const menus = await this.menusCollection.find({}).toArray();
+    return menus.map(menu => ({ 
+      ...menu, 
+      id: typeof menu.id === 'number' ? menu.id : parseInt(menu._id.toString(), 16) % 1000000,
+      _id: undefined 
+    } as any));
+  }
+
+  async getMenu(id: number): Promise<Menu | undefined> {
+    const menu = await this.menusCollection.findOne({ id: id });
+    return menu ? { ...menu, id: menu.id } : undefined;
+  }
+
+  async createMenu(insertMenu: InsertMenu): Promise<Menu> {
+    const maxIdDoc = await this.menusCollection.find({}).sort({ id: -1 }).limit(1).toArray();
+    let id = 1;
+    
+    if (maxIdDoc.length > 0 && typeof maxIdDoc[0].id === 'number' && !isNaN(maxIdDoc[0].id)) {
+      id = maxIdDoc[0].id + 1;
+    } else {
+      const count = await this.menusCollection.countDocuments();
+      id = count + 1;
+    }
+    
+    const menu: Menu = {
+      ...insertMenu,
+      id,
+      description: insertMenu.description || null,
+      isAvailable: insertMenu.isAvailable ?? true,
+      ingredients: insertMenu.ingredients || null,
+      allergens: insertMenu.allergens || null,
+      nutritionInfo: insertMenu.nutritionInfo || null,
+      imageUrl: insertMenu.imageUrl || null,
+      preparationTime: insertMenu.preparationTime || null,
+      createdAt: new Date()
+    } as any;
+    
+    await this.menusCollection.insertOne(menu as any);
+    return menu;
+  }
+
+  async updateMenu(id: number, updateData: Partial<InsertMenu>): Promise<Menu | undefined> {
+    await this.menusCollection.updateOne({ id: id }, { $set: updateData });
+    const menu = await this.menusCollection.findOne({ id: id });
+    return menu ? { ...menu, id: menu.id } : undefined;
+  }
+
+  async deleteMenu(id: number): Promise<boolean> {
+    const result = await this.menusCollection.deleteOne({ id: id });
     return result.deletedCount > 0;
   }
 }
